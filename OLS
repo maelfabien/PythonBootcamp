@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Aug  8 11:14:03 2018
+
+@author: administrateurformascience
+"""
+
+import numpy as np
+
+data = np.genfromtxt('http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv', delimiter=';', skip_header =1)
+
+y = data[:,-1]
+Z = data[:,:-1]
+ZTy = np.dot(Z.T, y)
+Zinv = np.linalg.inv(np.dot(Z.T,Z))
+B = np.dot(Zinv,ZTy)
+int(np.sum((np.dot(Z,B)-y)**2))
+
+#standardisation de Z
+X = (Z - np.mean(Z, axis=0))/np.std(Z,axis=0)
+
+XTy = np.dot(X.T, y)
+Xinv = np.linalg.inv(np.dot(X.T,X))
+C = np.dot(Xinv,XTy)
+print(int(np.sum((np.dot(X,C)-y)**2)))dt

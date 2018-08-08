@@ -1,0 +1,293 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Aug  8 11:39:28 2018
+
+@author: administrateurformascience
+
+I. Théorie
+
+Contexte : Admission de patients, mesure des taux de globules blancs et rouges,
+détermination de l'état de santé (malade ou sain)
+
+    1. Regression logistique
+
+Classer toutes les entrées selon une classification binaire (0,1) en sortie
+Features/Inputs/Paramètres = Taux de globules blancs & rouges chez les patients
+Sortie = Prédiction si le patient est malade ou non
+
+    2. Entrainement d'un modèle
+
+        a. Forward
+Données = Entrée de couples (X1, X2)
+
+Préactivation du neurone :
+    Z(X1, X2) = X1*w1 + X2*w2 + b
+où w1 et w2 sont les poids attribués aux observations X1 et X2 (car deux
+paramètres, globules blancs et globules rouges)
+et b est le biais
+
+Activation du neurone :
+    y = A(z) = sigmoïd(z) = 1 / (1 - exp(-z)) 
+Permet de faire tenir la fonction de préactivation entre 0 et 1
+"""
+import numpy as np
+
+#Nous n'avons pas de data set, il va falloir en créer un aléatoirement
+def get_dataset() :
+    """
+    Methode utilisée pour générer la dataset
+    """
+     #Nombre de données par classe (bonne santé, pas en bonne santé)
+    row_per_class = 100
+    sick = np.random.randn(row_per_class,2) + np.array([-2,-2])
+    healthy = np.random.randn(row_per_class,2) + np.array([2,2])
+    #Deux entrées, qui sont les deux taux que l'on veut avoir 
+    #On concatène les personnes malades et non-malades dans une même matrice
+    features = np.vstack([sick, healthy])
+    
+    #On défini les target, un vecteur qui dit si malade ou non par entrée
+    targets = np.concatenate((np.zeros(row_per_class), np.zeros(row_per_class)+1))
+    
+    return features, targets
+    
+
+def init_var() :
+    """
+    Init model variables : weights, biais
+    """
+    #Initialiser poids selon des var. aléatoires normales, pour les 2 entrées
+    weights = np.random.normal(size=2)
+    
+    #Valeur par défaut du biais
+    bias = 0
+    return weights, bias
+
+def pre_activation(features, weights, bias):
+    """
+    Compute preactivation
+    """
+    return np.dot(features, weights) + bias
+
+def activation(z):
+    """
+    Compute activation
+    """
+    return 1/(1+np.exp(-z))
+
+"""
+Fonction d'entrainement sans adaptation
+
+#Pour éviter de lancer automatique le code lors de l'import
+if __name__ == '__main__':
+    #Dataset
+    features, target = get_dataset()
+    #Variables
+    weights, bias = init_var()
+    
+    
+    #Compute pre-activation
+    z = pre_activation(features, weights, bias)
+    
+    #Compute activation
+    a = activation(z)
+    
+    #Si proba < 0.5, classe 0, sinon, classe 1
+    print(target)
+    print(a)
+    
+    pass
+
+        b. Erreur
+Cette prédiction contient une erreur : |Etat (0 ou 1) - Prédiction|
+
+    E = 1/2(y-t)**2
+
+y = prédiction
+t = target
+
+On cherche à minimiser l'erreur. Cependant, ce travail de minimisation ne peut 
+passer que par une descente de gradient.
+
+            i. Descente de gradient: Théorie
+
+x = x - α * ∇x
+
+Partir d'un point de départ random. Calculer la dérivée au point x = Gradient
+Attention à ne pas mettre un learning rate trop élevé, risque de divergence
+
+En cas de fonction de plusieurs variables à minimiser, on applique les dérivées
+partielles, puis on défini :
+    
+x = x - α * ∇x
+y = y - α * ∇y
+
+Exemple : 
+
+
+if __name__ == '__main__':
+    #Fonction à minimiser
+    fc = lambda x, y: (3*x**2) + (x*y) + (5*y**2)
+    #Définir les dérivées partielles
+    der_par_x = lambda x, y: (6 * x) + y
+    der_par_y = lambda x, y: (10 * y) + x
+    
+    #Initialiser les variables
+    x=10
+    y=-13
+    
+    #Learning rate
+    learning_rate = 0.1
+    print("fc = %s" % (fc(x,y)))
+    
+    #Une "epoch" correspond à une période de minimisation
+    for epochs in range(0,100):
+        #Calculer les gradients
+        x_gradient = der_par_x(x,y)
+        y_gradient = der_par_y(x,y)
+        #Descente de gradient
+        x = x - x_gradient * learning_rate
+        y = y - y_gradient * learning_rate
+        
+        print("fc = %s" % (fc(x,y)))
+        
+    #Print final variable values
+    print("")
+    print("x = %s" % x)
+    print("y= %s" % y)
+    
+
+Notre fonction à minimiser n'est plus 3x^2 + xy + 5y^2 mais E = 0.5(y-t)^2
+
+Les dérivées partielles sont (Chain rule) :
+    dE/dw1 = (y.t)A'(z)x1
+    dE/dw2 = (y.t)A'(z)x2
+    dE/db = (y-t)A'(z)
+    
+    où A(z) = sigmoïd(z) et z = w1X1 + w2X2 + b
+    
+Rappel : Chain rule / Dérivée de fonctions composées
+
+    d/dz p(q(z)) = dp/dq dq/dz
+
+On défini q = (y-t) et p = 1/2 * (q)^2
+
+    dp/dq = q = (y-t)
+    
+    dE/dw1 = d/dw1 p(q(w1)) = dp/dq * dq/dw1 = q * d/dw1 (q)
+        = (y-t) * d/dw1 (y-t)
+        
+        1. On refait une chain rule pour d/dw1 (y-t) :
+            
+            q = y = A(z)
+            p = q-t = y-t = A(z) - t
+            #t est une valeur réelle, 0 ou 1, et ne dépend de rien
+            
+            dp/dq = 1
+            
+        On remplace dans dE/dw1 :
+            dE/dw1 = (y-t) * d/dw1 (y-t) = (y-t) * 1 * dA(z)/dw1
+                = (y-t) dA(z)/dw1
+        
+        2. On peut refaire une chain rule sur dA(z)/dw1 :
+            Rappel : z = Z(x)
+            
+            q = z = ∑ wi*Xi + b
+            p = A(q) = A(z)
+            dp/dq = A'(z)
+        
+        On insère à nouveau les termes
+        dE/dw1 = (y-t)A'(z) * d/dw1 (∑ wi*Xi + b)
+        
+        Dans notre exemple avec deux classes/inputs, on déduit les résultats :
+        
+        dE/dw1 = (y-t)A'(z) * d/dw1 (w1X1 + w2X2 + b)
+            = (y-t)A'(z)x1
+            
+        E/dw2 = (y-t)A'(z)x2
+        
+        dE/db = (y-t)A'(z)
+       
+
+        c. Backward
+        
+On parle désormais d'entrainement du modèle : on sait comment calculer nos 
+prédictions, calculer et minimiser nos erreurs, il faut désormais ajuster les
+paramètres lors de chaque itération.
+
+Objectif : Tracer une frontière de décision claire entre les deux groupes de 
+personnes malades et saines
+
+"""
+
+#Pour l'affichage
+import matplotlib.pyplot as plt
+
+def predict(features, weights, bias):
+    z = pre_activation(features, weights, bias)
+    y = activation(z)
+    return np.round(y)
+    #On arrondit soit à 0 soit à 1 la prédiction
+
+#On calcule le "coût" total de l'erreur commise dans la prédiction
+def cost(predictions, targets):
+    return np.mean((predictions-targets)**2)
+
+#Fonction pour la dérivée de la sigmoïde
+def derivative_activation(z):
+    return activation(z)*(1-activation(z))
+
+def train(features, targets, weights, bias):
+    epochs = 100
+    learning_rate = 0.1
+    #Afficher l'accuracy, si 100%, on classe bien 100% des gens
+    #le but de la variable prédiction est de renvoyer des 0 ou des 1
+    predictions = predict(features, weights, bias)
+    print("Accuracy", np.mean(predictions==targets))
+    
+    #Plot points
+    plt.scatter(features[:,0], features[:,1], s=40, c=targets, cmap = plt.cm.Spectral)
+    plt.show()
+    
+    for epoch in range(epochs):
+        # Toutes les 10 epoch, on veut afficher l'erreur totale actuelle
+        #Pour observer la progression
+        if epoch % 10 == 0: 
+            predictions = activation(pre_activation(features, weights, bias))
+            print("Current cost = %s" % cost(predictions, targets))
+            
+        #Init gradients
+        #On initialise les gradients à 0, puis on cacule une moyenne des gradients
+        #pour déterminer un sens d'avancement 
+        
+        w_gradients = np.zeros(weights.shape)
+        #Initialise le biais à 0
+        bias_gradient = 0
+        
+        #Itérer dans les données
+        for feature, target in zip(features, targets):
+            z = pre_activation(feature, weights, bias)
+            y = activation(z)
+            #update gradients
+            w_gradients += (y-target) * derivative_activation(z) * feature
+            #Multiplie le premier poids par le premier élément de features, et le 
+            #deuxième par le deuxième élément du vecteur
+            bias_gradient = (y-target) * derivative_activation(z)
+            #Correspond aux formules des dérivées partielles
+        #Update variables
+        weights = weights - learning_rate * w_gradients
+        bias = bias - learning_rate * bias_gradient
+    #Affiche à nouveau l'accuracy
+    predictions = predict(features, weights, bias)
+    print("Accuracy", np.mean(predictions==targets))
+            
+
+    
+if __name__ == '__main__':
+    #Dataset
+    features, target = get_dataset()
+    #Variables
+    weights, bias = init_var()
+    
+    train(features, target, weights, bias)
+    

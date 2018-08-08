@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Aug  8 09:36:09 2018
+
+@author: administrateurformascience
+"""
+
+import numpy as np
+
+#Construction de la matrice X et X transposée
+E = np.zeros((8,8), dtype=int) 
+E[0,7] = 1
+print(E)
+
+X = np.diag([1,1,1,1,1,1,1,1])
+X = X + E
+print(X)
+
+Y = np.transpose(np.mat([1,1,1,1,1,1,1,1]))
+print(Y)
+
+XT = np.transpose(X)
+
+#Moindre Carré
+B = np.linalg.inv(XT.dot(X)).dot(XT).dot(Y)
+
+print(B)
+
+print(B.sum(axis=0))
+
+#Définir le rang de la matrice
+D = XT.dot(X) - np.diag([1,1,1,1,1,1,1,1])
+print(D)
+
+Eig = np.linalg.eigvals(D)
+print(Eig)
+
+#Compter le nombre d'éléments non-nuls
+Rang = np.sum(Eig != 0)
+print(Rang)
